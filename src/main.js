@@ -94,10 +94,14 @@ DataFiles     = new (require('./datafiles.js').DataFiles) (TheMatron, DATADIR, D
 SafeStream    = require('./safestream.js').SafeStream
 MotusUp       = new (require('./motus_up.js').MotusUploader) (TheMatron, STATEFILE)
 Feed          = new (require('./datafeed.js').Feed)(TheMatron, FEEDCONFIG)
-// Create the two datafiles we write to for Lotek and CTT detections
-// Rotate every hour and also if hitting 1MB in size
+// Create datafiles for Lotek, CTT 434, and CTT Blu detections.
+// Rotate every hour and also if hitting 1MB in size.
 AllOut        = new SafeStream(TheMatron, "all", ".txt", 1000000, 3600, "parse")
 LifetagOut    = new SafeStream(TheMatron, "ctt", ".txt", 1000000, 3600, "parse")
+BluOut        = new SafeStream(
+    TheMatron, "blu", ".txt", 1000000, 3600, "parse",
+    "UsbPort,BluRadioId,RadioId,Time,TagRSSI,TagId,Sync,Product,Revision,NodeId,Payload\r\n"
+)
 
 Upgrader      = new Machine.Upgrader()
 SysMonitor    = new (require('./sysmonitor.js'))(TheMatron)

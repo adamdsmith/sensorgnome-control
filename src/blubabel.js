@@ -4,9 +4,10 @@
 // receiver on. Commands and responses are newline-delimited JSON. Detection
 // queues are polled independently on channels 1-4.
 //
-// Initial scope: transport, polling, timestamp reconstruction, payload decode,
-// and logging only. SG gotTag/data-file mapping is intentionally deferred until
-// channel mapping is defined.
+// Detections are written to the SG-native BluOut SafeStream using the same
+// 11-column CSV schema that CTT SensorStation writes for directly attached
+// BluSeries receivers. SG handles rotation/upload bookkeeping; the row contract
+// remains CTT-compatible.
 
 const {SerialPort} = require('serialport')
 
@@ -169,6 +170,10 @@ class BluBabel {
     this.handleDetection(msg)
   }
 
+  formatCttTime(timestampSeconds) {
+    return new Date(timestampSeconds * 1000).toISOString().slice(0, 19).replace('T', ' ')
+  }
+
   handleDetection(msg) {
     const channel = msg.channel
     const data = msg.data ?? {}
@@ -187,6 +192,22 @@ class BluBabel {
       console.log(`CTTBlu port ${this.getPort()} ch${channel}: decode error: ${err.message}`)
       return
     }
+
+    const cttRow = [
+      this.getPort(),
+      channel,
+      '',
+      this.formatCttTime(timestamp),
+      rssi,
+      decoded.tagId.toUpperCase(),
+      decoded.sync,
+      decoded.product,
+      decoded.revision,
+      '',
+      decoded.rawPayloadHex.toUpperCase()
+    ].join(',')
+
+    if (typeof BluOut !== 'undefined') BluOut.write(cttRow + '\r\n')
 
     console.log(
       `CTTBlu detection port ${this.getPort()} ch${channel}: ` +
@@ -215,6 +236,7 @@ class BluBabel {
       revision: buf.readUInt8(7),
       solar: null,
       temp: null,
+      rawPayloadHex: buf.length > 8 ? buf.slice(8).toString('hex') : '',
       extraPayloadHex: ''
     }
 
