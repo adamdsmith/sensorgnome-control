@@ -17,6 +17,7 @@
 const {SerialPort} = require('serialport')
 const DigiBabel = require('./digibabel')
 const NanoBabel = require('./nanobabel')
+const BluBabel = require('./blubabel')
 
 const DB_PROBE_TIMEOUT_MS  = 2500
 const BLU_BOOT_DELAY_MS     = 1600
@@ -173,14 +174,10 @@ class FTDIReceiverProbe {
       if (type === 'DigiBabel') {
         matron.devices[dev.attr.port] = new DigiBabel(matron, dev, options)
       } else if (type === 'CTTBlu') {
-        // Identification is implemented before the receiver driver on purpose.
-        // Keep this probe object in place so the device remains claimed and
-        // cannot fall through to NanoBabel while BluBabel is developed.
         dev.attr.type = 'CTTBlu'
         dev.attr.radio = 'CTTBlu'
         matron.emit('cttBluIdentified', { port: dev.attr.port })
-        matron.emit('devState', dev.attr.port, 'init', 'CTTBlu identified; receiver driver not yet active')
-        matron.devices[dev.attr.port] = this
+        matron.devices[dev.attr.port] = new BluBabel(matron, dev, options)
       } else {
         dev.attr.type = 'NanoBabel'
         dev.attr.radio = 'NanoBabel'
