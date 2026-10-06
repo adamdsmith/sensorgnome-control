@@ -100,9 +100,17 @@ class FTDIReceiverProbe {
         this.textBuffer += data.toString('utf8')
         let newline
         while ((newline = this.textBuffer.indexOf('\n')) !== -1) {
-          const line = this.textBuffer.slice(0, newline).trim()
+          let line = this.textBuffer.slice(0, newline).trim()
           this.textBuffer = this.textBuffer.slice(newline + 1)
           if (!line) continue
+
+          // Blū may emit a couple of non-JSON boot bytes before the VERSION
+          // response (observed as 0x2c 0x00). Discard any prefix before the
+          // first JSON object rather than letting it poison the whole line.
+          const jsonStart = line.indexOf('{')
+          if (jsonStart === -1) continue
+          line = line.slice(jsonStart)
+
           try {
             const msg = JSON.parse(line)
             if (msg?.type === 1 && msg?.channel === 1 && msg?.data !== undefined) {
