@@ -1,4 +1,4 @@
-// lotekprobe.js — identify whether a connected 0403:6015 (FTDI FT230X) device
+// ftdireceiverprobe.js — identify a connected 0403:6015 (FTDI FT230X) receiver
 // is a DigiBabel (230400 baud) or NanoBabel (115200 baud) receiver.
 //
 // Both devices use the same USB VID:PID and product string and cannot be
@@ -47,7 +47,7 @@ function buildDetOffFrame() {
 
 const DET_OFF_FRAME = buildDetOffFrame()
 
-class LotekProbe {
+class FTDIReceiverProbe {
   constructor(matron, dev, options) {
     this.matron = matron
     this.dev = dev
@@ -69,7 +69,7 @@ class LotekProbe {
     this.sp = new SerialPort({ path, baudRate: 230400, dataBits: 8, parity: 'none', stopBits: 1 })
 
     this.sp.on("open", () => {
-      console.log(`LotekProbe: probing ${path} (port ${this.getPort()}) for DigiBabel vs NanoBabel`)
+      console.log(`FTDIReceiverProbe: probing ${path} (port ${this.getPort()}) for DigiBabel vs NanoBabel`)
       setTimeout(() => {
         if (!this.dev || !this.sp?.isOpen) return
         this.sp.write(DET_OFF_FRAME)
@@ -100,7 +100,7 @@ class LotekProbe {
     clearTimeout(this.probeTimeout)
     this.probeTimeout = null
 
-    console.log(`LotekProbe: port ${this.getPort()} identified as ${type}`)
+    console.log(`FTDIReceiverProbe: port ${this.getPort()} identified as ${type}`)
 
     const create = () => {
       if (!this.dev) return
@@ -136,4 +136,4 @@ class LotekProbe {
   }
 }
 
-module.exports = LotekProbe
+module.exports = FTDIReceiverProbe
