@@ -1,22 +1,29 @@
 // ftdireceiverprobe.js — identify a connected 0403:6015 (FTDI FT230X) receiver
-// is a DigiBabel (230400 baud) or NanoBabel (115200 baud) receiver.
+// as DigiBabel, CTT Blū, or NanoBabel.
 //
-// Both devices use the same USB VID:PID and product string and cannot be
-// distinguished in udev.  This probe opens at 230400 baud, sends the DigiBabel
-// DET_OFF command, and waits up to PROBE_TIMEOUT_MS for any byte matching the
-// DigiBabel START_FLAG (0x3C).  A NanoBabel at 115200 baud will not respond,
-// so a timeout means NanoBabel.
+// These receivers can enter SensorGnome through the same FTDI USB identity
+// (VID=0403, PID=6015), so udev alone cannot distinguish them. Identification
+// is deliberately protocol-level and ordered:
 //
-// Once identified the probe closes its port and creates the real device object,
-// replacing itself in matron.devices[port].
+//   1. Preserve the existing DigiBabel probe unchanged.
+//   2. If DigiBabel does not answer, explicitly power on CTT Blū with DTR low,
+//      wait for boot, and issue a non-destructive VERSION request.
+//   3. If neither protocol answers, retain the existing NanoBabel fallback.
+//
+// Once a receiver is positively identified, the probe closes its serial port.
+// DigiBabel and NanoBabel are handed to their existing drivers. CTT Blū is
+// positively identified here; its receiver driver is added separately.
 
 const {SerialPort} = require('serialport')
 const DigiBabel = require('./digibabel')
 const NanoBabel = require('./nanobabel')
 
-const PROBE_TIMEOUT_MS = 2500
-const DB_START_FLAG    = 0x3C
-const DB_POLY16        = 0x1021
+const DB_PROBE_TIMEOUT_MS  = 2500
+const BLU_BOOT_DELAY_MS     = 1600
+const BLU_PROBE_TIMEOUT_MS  = 1500
+const DB_START_FLAG         = 0x3C
+const DB_POLY16             = 0x1021
+const BLU_VERSION_REQUEST   = '{"type":1,"channel":1,"data":{}}\r\n'
 
 // ---- minimal CRC-16 and frame builder needed to send the DET_OFF probe ----
 
@@ -55,6 +62,8 @@ class FTDIReceiverProbe {
     this.sp = null
     this.probeTimeout = null
     this.resolved = false
+    this.phase = 'digibabel'
+    this.textBuffer = ''
 
     this.matron.on("devRemoved", (dev) => this.devRemoved(dev))
     this.matron.emit("devState", dev.attr.port, "init")
@@ -69,28 +78,76 @@ class FTDIReceiverProbe {
     this.sp = new SerialPort({ path, baudRate: 230400, dataBits: 8, parity: 'none', stopBits: 1 })
 
     this.sp.on("open", () => {
-      console.log(`FTDIReceiverProbe: probing ${path} (port ${this.getPort()}) for DigiBabel vs NanoBabel`)
+      console.log(`FTDIReceiverProbe: probing ${path} (port ${this.getPort()}) for DigiBabel`)
       setTimeout(() => {
-        if (!this.dev || !this.sp?.isOpen) return
+        if (!this.dev || !this.sp?.isOpen || this.resolved) return
         this.sp.write(DET_OFF_FRAME)
       }, 300)
-      this.probeTimeout = setTimeout(() => this.resolve('NanoBabel'), PROBE_TIMEOUT_MS)
+      this.probeTimeout = setTimeout(() => this.startBluProbe(), DB_PROBE_TIMEOUT_MS)
     })
 
     this.sp.on("data", data => {
-      // Any 0x3C byte means a DigiBabel replied with a framed response
-      if (!this.resolved && data.includes(DB_START_FLAG)) {
-        this.resolve('DigiBabel')
+      if (this.resolved) return
+
+      // Preserve existing DigiBabel identification semantics.
+      if (this.phase === 'digibabel') {
+        if (data.includes(DB_START_FLAG)) this.resolve('DigiBabel')
+        return
+      }
+
+      // CTT Blū replies with newline-delimited JSON.
+      if (this.phase === 'cttblu') {
+        this.textBuffer += data.toString('utf8')
+        let newline
+        while ((newline = this.textBuffer.indexOf('\n')) !== -1) {
+          const line = this.textBuffer.slice(0, newline).trim()
+          this.textBuffer = this.textBuffer.slice(newline + 1)
+          if (!line) continue
+          try {
+            const msg = JSON.parse(line)
+            if (msg?.type === 1 && msg?.channel === 1 && msg?.data !== undefined) {
+              this.resolve('CTTBlu')
+              return
+            }
+          } catch (_) {
+            // Ignore non-JSON / wrong-baud bytes while probing.
+          }
+        }
       }
     })
 
     this.sp.on("error", err => {
-      console.log(`LotekProbe error on ${path}: ${err.message}`)
+      console.log(`FTDIReceiverProbe error on ${path}: ${err.message}`)
       if (!this.resolved) this.resolve('NanoBabel')
     })
 
     this.sp.on("close", () => {
       if (!this.resolved) this.resolve('NanoBabel')
+    })
+  }
+
+  startBluProbe() {
+    if (this.resolved || !this.dev || !this.sp?.isOpen) return
+    clearTimeout(this.probeTimeout)
+    this.probeTimeout = null
+    this.phase = 'cttblu'
+    this.textBuffer = ''
+
+    console.log(`FTDIReceiverProbe: no DigiBabel response on port ${this.getPort()}; probing for CTTBlu`)
+
+    // CTT Blū power is controlled by DTR: false/low = powered on.
+    this.sp.set({ dtr: false }, err => {
+      if (err) {
+        console.log(`FTDIReceiverProbe: failed to set DTR for CTTBlu probe on port ${this.getPort()}: ${err.message}`)
+        this.resolve('NanoBabel')
+        return
+      }
+
+      setTimeout(() => {
+        if (this.resolved || !this.dev || !this.sp?.isOpen) return
+        this.sp.write(BLU_VERSION_REQUEST)
+        this.probeTimeout = setTimeout(() => this.resolve('NanoBabel'), BLU_PROBE_TIMEOUT_MS)
+      }, BLU_BOOT_DELAY_MS)
     })
   }
 
@@ -107,6 +164,15 @@ class FTDIReceiverProbe {
       const { matron, dev, options } = this
       if (type === 'DigiBabel') {
         matron.devices[dev.attr.port] = new DigiBabel(matron, dev, options)
+      } else if (type === 'CTTBlu') {
+        // Identification is implemented before the receiver driver on purpose.
+        // Keep this probe object in place so the device remains claimed and
+        // cannot fall through to NanoBabel while BluBabel is developed.
+        dev.attr.type = 'CTTBlu'
+        dev.attr.radio = 'CTTBlu'
+        matron.emit('cttBluIdentified', { port: dev.attr.port })
+        matron.emit('devState', dev.attr.port, 'init', 'CTTBlu identified; receiver driver not yet active')
+        matron.devices[dev.attr.port] = this
       } else {
         dev.attr.type = 'NanoBabel'
         dev.attr.radio = 'NanoBabel'
