@@ -29,6 +29,7 @@ class BluBabel {
     this.buffer = ''
     this.pollTimer = null
     this.pollIndex = 0
+    this.awaitingChannel = null
     this.retries = 0
     this.fwVersion = null
 
@@ -41,9 +42,10 @@ class BluBabel {
 
   close() {
     if (this.pollTimer) {
-      clearInterval(this.pollTimer)
+      clearTimeout(this.pollTimer)
       this.pollTimer = null
     }
+    this.awaitingChannel = null
     if (this.sp) {
       if (this.sp.isOpen) this.sp.close()
       this.sp = null
@@ -123,13 +125,29 @@ class BluBabel {
   }
 
   startPolling() {
-    if (this.pollTimer) clearInterval(this.pollTimer)
+    if (this.pollTimer) clearTimeout(this.pollTimer)
     this.pollIndex = 0
-    this.pollTimer = setInterval(() => {
+    this.awaitingChannel = null
+    this.scheduleNextPoll()
+  }
+
+  scheduleNextPoll() {
+    if (!this.dev || !this.sp?.isOpen || this.awaitingChannel != null) return
+    if (this.pollTimer) clearTimeout(this.pollTimer)
+    this.pollTimer = setTimeout(() => {
+      this.pollTimer = null
+      if (!this.dev || !this.sp?.isOpen || this.awaitingChannel != null) return
       const channel = CHANNELS[this.pollIndex]
-      this.pollIndex = (this.pollIndex + 1) % CHANNELS.length
+      this.awaitingChannel = channel
       this.send(TYPE_DETECTIONS, channel)
     }, POLL_INTERVAL_MS)
+  }
+
+  finishPoll(channel) {
+    if (channel !== this.awaitingChannel) return
+    this.awaitingChannel = null
+    this.pollIndex = (this.pollIndex + 1) % CHANNELS.length
+    this.scheduleNextPoll()
   }
 
   processBuffer() {
@@ -165,7 +183,10 @@ class BluBabel {
     }
 
     if (msg?.type !== TYPE_DETECTIONS) return
-    if (!msg.data || Object.keys(msg.data).length === 0) return
+    if (!msg.data || Object.keys(msg.data).length === 0) {
+      this.finishPoll(msg.channel)
+      return
+    }
 
     this.handleDetection(msg)
   }
