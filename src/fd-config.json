@@ -2969,7 +2969,7 @@
     },
     "w04943": {
       "kind": "TextView",
-      "rows": 4,
+      "rows": 6,
       "cols": 6,
       "static": {
         "title": "Tags and Pulses",
@@ -2984,7 +2984,7 @@
     },
     "w04103": {
       "kind": "UsbPortMap",
-      "rows": 5,
+      "rows": 3,
       "cols": 6,
       "static": {
         "title": "UsbPortMap",
