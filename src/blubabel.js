@@ -209,6 +209,19 @@ class BluBabel {
 
     if (typeof BluOut !== 'undefined') BluOut.write(cttRow + '\r\n')
 
+    this.matron.emit('bluDetection', {
+      port: this.getPort(),
+      channel,
+      timestamp,
+      rssi,
+      tagId: decoded.tagId.toUpperCase(),
+      sync: decoded.sync,
+      product: decoded.product,
+      revision: decoded.revision,
+      temp: decoded.temp,
+      solar: decoded.solar
+    })
+
     console.log(
       `CTTBlu detection port ${this.getPort()} ch${channel}: ` +
       `ts=${timestamp.toFixed(3)} tag=${decoded.tagId} rssi=${rssi} ` +
