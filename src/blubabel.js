@@ -35,7 +35,8 @@ class BluBabel {
     this.retries = 0
     this.fwVersion = null
 
-    this.matron.on('devRemoved', dev => this.devRemoved(dev))
+    this.onDevRemoved = dev => this.devRemoved(dev)
+    this.matron.on('devRemoved', this.onDevRemoved)
     this.init_sp()
   }
 
@@ -60,6 +61,7 @@ class BluBabel {
 
   devRemoved(dev) {
     if (!this.dev || dev.path !== this.dev.path) return
+    this.matron.removeListener('devRemoved', this.onDevRemoved)
     this.close()
     this.dev = null
   }

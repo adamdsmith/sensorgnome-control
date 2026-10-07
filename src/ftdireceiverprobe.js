@@ -66,7 +66,8 @@ class FTDIReceiverProbe {
     this.phase = 'digibabel'
     this.textBuffer = ''
 
-    this.matron.on("devRemoved", (dev) => this.devRemoved(dev))
+    this.onDevRemoved = dev => this.devRemoved(dev)
+    this.matron.on("devRemoved", this.onDevRemoved)
     this.matron.emit("devState", dev.attr.port, "init")
     this.startProbe()
   }
@@ -166,6 +167,7 @@ class FTDIReceiverProbe {
     this.resolved = true
     clearTimeout(this.probeTimeout)
     this.probeTimeout = null
+    this.matron.removeListener("devRemoved", this.onDevRemoved)
 
     console.log(`FTDIReceiverProbe: port ${this.getPort()} identified as ${type}`)
 
@@ -203,6 +205,7 @@ class FTDIReceiverProbe {
   devRemoved(dev) {
     if (!this.dev || dev.path !== this.dev.path) return
     this.resolved = true  // prevent resolve() from firing after removal
+    this.matron.removeListener("devRemoved", this.onDevRemoved)
     this.close()
     this.dev = null
   }
