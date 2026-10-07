@@ -30,6 +30,7 @@ class BluBabel {
     this.buffer = ''
     this.pollTimer = null
     this.pollTimeout = null
+    this.retryTimer = null
     this.pollIndex = 0
     this.awaitingChannel = null
     this.retries = 0
@@ -51,6 +52,10 @@ class BluBabel {
     if (this.pollTimeout) {
       clearTimeout(this.pollTimeout)
       this.pollTimeout = null
+    }
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer)
+      this.retryTimer = null
     }
     this.awaitingChannel = null
     if (this.sp) {
@@ -111,7 +116,11 @@ class BluBabel {
       if (this.dev) this.matron.emit('devState', this.getPort(), 'error', err.message)
       if (sp.isOpen) sp.close()
       if (this.dev && this.retries++ < 3) {
-        setTimeout(() => this.init_sp(), this.retries < 3 ? 10000 : 60000)
+        const delay = this.retries < 3 ? 10000 : 60000
+        this.retryTimer = setTimeout(() => {
+          this.retryTimer = null
+          this.init_sp()
+        }, delay)
       }
     })
 
