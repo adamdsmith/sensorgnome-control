@@ -27,6 +27,7 @@ class BluBabel {
     this.dev = dev
     this.options = options ?? {}
     this.sp = null
+    this.closing = false
     this.buffer = ''
     this.pollTimer = null
     this.pollTimeout = null
@@ -59,6 +60,7 @@ class BluBabel {
     }
     this.awaitingChannel = null
     if (this.sp) {
+      this.closing = true
       if (this.sp.isOpen) this.sp.close()
       this.sp = null
     }
@@ -86,6 +88,7 @@ class BluBabel {
     const did = debugId++
 
     sp.on('open', () => {
+      this.closing = false
       console.log(`Opened CTTBlu SerialPort #${did} ${path}`)
       sp.set({dtr: false}, err => {
         if (err) {
@@ -107,7 +110,7 @@ class BluBabel {
 
     sp.on('close', () => {
       console.log(`CTTBlu SerialPort #${did} ${path} was closed`)
-      if (this.dev && !this.dev.state?.startsWith('err'))
+      if (!this.closing && this.dev && !this.dev.state?.startsWith('err'))
         this.matron.emit('devState', this.getPort(), 'error', 'port was closed')
     })
 
