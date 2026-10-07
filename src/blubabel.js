@@ -14,6 +14,7 @@ const {SerialPort} = require('serialport')
 const BAUD_RATE = 230400
 const BOOT_DELAY_MS = 1600
 const POLL_INTERVAL_MS = 250
+const POLL_TIMEOUT_MS = 1500
 const CHANNELS = [1, 2, 3, 4]
 const TYPE_VERSION = 1
 const TYPE_DETECTIONS = 6
@@ -28,6 +29,7 @@ class BluBabel {
     this.sp = null
     this.buffer = ''
     this.pollTimer = null
+    this.pollTimeout = null
     this.pollIndex = 0
     this.awaitingChannel = null
     this.retries = 0
@@ -44,6 +46,10 @@ class BluBabel {
     if (this.pollTimer) {
       clearTimeout(this.pollTimer)
       this.pollTimer = null
+    }
+    if (this.pollTimeout) {
+      clearTimeout(this.pollTimeout)
+      this.pollTimeout = null
     }
     this.awaitingChannel = null
     if (this.sp) {
@@ -140,11 +146,25 @@ class BluBabel {
       const channel = CHANNELS[this.pollIndex]
       this.awaitingChannel = channel
       this.send(TYPE_DETECTIONS, channel)
+      this.pollTimeout = setTimeout(() => this.pollTimedOut(channel), POLL_TIMEOUT_MS)
     }, POLL_INTERVAL_MS)
   }
 
   finishPoll(channel) {
     if (channel !== this.awaitingChannel) return
+    if (this.pollTimeout) {
+      clearTimeout(this.pollTimeout)
+      this.pollTimeout = null
+    }
+    this.awaitingChannel = null
+    this.pollIndex = (this.pollIndex + 1) % CHANNELS.length
+    this.scheduleNextPoll()
+  }
+
+  pollTimedOut(channel) {
+    if (channel !== this.awaitingChannel) return
+    this.pollTimeout = null
+    console.log(`CTTBlu port ${this.getPort()} ch${channel}: detection poll timed out`)
     this.awaitingChannel = null
     this.pollIndex = (this.pollIndex + 1) % CHANNELS.length
     this.scheduleNextPoll()
