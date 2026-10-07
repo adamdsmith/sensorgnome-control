@@ -1447,7 +1447,8 @@ class Dashboard {
 
             // display
             for (const what of ['lotek-tags', 'lotek-pulses', 'lotek-noise', 'lotek-snr',
-                    'lotek-rate', 'ctt-tags', 'lotek-unique_tags', 'ctt-unique_tags']) {
+                    'lotek-rate', 'ctt-tags', 'blu-tags',
+                    'lotek-unique_tags', 'ctt-unique_tags', 'blu-unique_tags']) {
                 this.tsShow(what)
             }
             this.tsTallyShow()

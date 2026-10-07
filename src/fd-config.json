@@ -2973,7 +2973,7 @@
       "cols": 6,
       "static": {
         "title": "Tags and Pulses",
-        "popup_info": "# Detection log\n\nThe detection log shows raw detections coming from the radios. Its primary purpose is to verify correct operation of the radios. For CTT tags the format is as follows:\n\nTAG: T6,1665900910.226,78664C33,-95\n\nThe T6 refers to CTT radio on port 6, 1665900910.226 is the timestamp (seconds since 1970-1-1) 78664C33 is the CTT tag ID and -95 is the RSSI (dBm).\n\nFor Lotek tag first the raw radio pulses are shown as follows:\n\nPLS: p5,1665900923.5965,3.96,-48.31,-60.86\n\nPLS stands for pulse, p5 refers to \"pulse on port 5\", this is followed by the time-stamp, the frequency offset in kHz from the nominal frequency, the RSSI (dBm) and the noise (dBm). It takes 2 bursts of 4 pulses to detect a tag if the tag is found in the local tag database. A tag detection is shown as follows:\n\nTAG: L5,1665900923.5965,TestTags#1.1@166.38:25.1,3.971,0.02,-48.1,11.1,-60.9,3223,95,1.97e-07,-4.96e-05,166.38\n\nThe L5 refers to a Lotek tag detected by the radio on port 5. This is followed by the tag name and ID, the nominal frequency, the pulse interval (25.1s in this case), the freq offset in kHz, and further details about the pulse burst.",
+        "popup_info": "# Detection log\n\nThe detection log shows raw detections coming from the radios. Its primary purpose is to verify correct operation of the radios. For CTT tags the format is as follows:\n\nTAG: T6,1665900910.226,78664C33,-95\n\nThe T6 refers to CTT radio on port 6, 1665900910.226 is the timestamp (seconds since 1970-1-1) 78664C33 is the CTT tag ID and -95 is the RSSI (dBm).\n\nFor Lotek tag first the raw radio pulses are shown as follows:\n\nPLS: p5,1665900923.5965,3.96,-48.31,-60.86\n\nPLS stands for pulse, p5 refers to \"pulse on port 5\", this is followed by the time-stamp, the frequency offset in kHz from the nominal frequency, the RSSI (dBm) and the noise (dBm). It takes 2 bursts of 4 pulses to detect a tag if the tag is found in the local tag database. A tag detection is shown as follows:\n\nTAG: L5,1665900923.5965,TestTags#1.1@166.38:25.1,3.971,0.02,-48.1,11.1,-60.9,3223,95,1.97e-07,-4.96e-05,166.38\n\nThe L5 refers to a Lotek tag detected by the radio on port 5. This is followed by the tag name and ID, the nominal frequency, the pulse interval (25.1s in this case), the freq offset in kHz, and further details about the pulse burst.\n\nFor Blu tag detections the format is:\n\nBLU B3-4 18:39:21: 717DF3DC -61dBm 25.24°C\n\nB3-4 identifies Blu receiver port 3, radio channel 4. This is followed by the UTC detection time, tag ID, RSSI (dBm), and temperature when present.",
         "color": ""
       },
       "dynamic": {
@@ -3209,6 +3209,41 @@
         "span_gaps": "system/graphs/labels"
       },
       "id": "w07770"
+    },
+    "w10110": {
+      "kind": "TimePlot",
+      "rows": 3,
+      "cols": 3,
+      "static": {
+        "title": "Blu Tag Detections",
+        "axes": [
+          "left"
+        ],
+        "popup_info": "",
+        "left_unit": "/hr",
+        "left_min": 0,
+        "left_decimals": 0
+      },
+      "dynamic": {
+        "data": "detections/blu-tags/data",
+        "labels": "detections/blu-tags/labels"
+      },
+      "id": "w10110",
+      "output": null
+    },
+    "w10111": {
+      "kind": "TimePlot",
+      "rows": 3,
+      "cols": 3,
+      "static": {
+        "title": "Unique Blu Tags"
+      },
+      "dynamic": {
+        "span_gaps": "detections/blu-unique_tags/labels",
+        "labels": "detections/blu-unique_tags/labels",
+        "data": "detections/blu-unique_tags/data"
+      },
+      "id": "w10111"
     }
   },
   "grids": {
@@ -3269,6 +3304,7 @@
         "w08212",
         "w09262",
         "w07258",
+        "w10110",
         "w09712",
         "w09240",
         "w07135",
@@ -3276,6 +3312,7 @@
         "w06943",
         "w04594",
         "w04309",
+        "w10111",
         "w02709"
       ],
       "id": "g08970",
