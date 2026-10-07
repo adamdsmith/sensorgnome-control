@@ -27,7 +27,7 @@ function quitProcess () {
     doneQuit = true
     console.log("Exiting from main.js!\n")
     TheMatron.emit("quit")
-    setTimeout(function() {console.log("Bye"); process.exit(1)}, 3000)
+    setTimeout(function() {console.log("Bye"); process.exit(0)}, 3000)
 }
 
 process.on("SIGTERM", quitProcess)
