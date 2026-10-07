@@ -25,7 +25,7 @@ const { FileInfo } = require("./datafiles")
 OpenFiles = [] // file names of currently open files so DataFiles doesn't add them to its list
 
 class SafeStream {
-    constructor (matron, source, ext, chunkbytes, chunksecs, parse, header=null) {
+    constructor (matron, source, ext, chunkbytes, chunksecs, parse) {
         // source will usually be "all", and extension will usually be ".txt"
 
         this.matron = matron
@@ -35,7 +35,6 @@ class SafeStream {
         this.chunkbytes = chunkbytes
         this.lastData = null
         this.parse = parse
-        this.header = header
         this.sout = null
         this.bytesWritten = 0
         this.chunkTimer = null
@@ -51,10 +50,6 @@ class SafeStream {
         OpenFiles.push(this.sout.path)
         this.sout.stream.on("error", (e) => this.streamError(e))
         this.bytesWritten = 0
-        if (this.header) {
-            this.sout.stream.write(this.header)
-            this.bytesWritten += Buffer.byteLength(this.header)
-        }
         this.info = this.parse && new FileInfo(this.sout.path)
         if (this.chunkTimer) clearTimeout(this.chunkTimer)
         // only fires while this.sout is open, so end() always has a real file to rotate
