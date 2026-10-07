@@ -46,13 +46,14 @@ function signalColor(dbm, min, max) {
 
 // Port colour matching usb-port-map.vue's portFill logic.
 function devPortColor(type, freq) {
+    const t = (type || '').toLowerCase()
+    if (t === 'cttblu') return '#7C3AED'              // CTT Blū / 2.4 GHz FSK
     const f = parseFloat(freq)
     if (!isNaN(f) && f > 0) {
         if (f > 430 && f < 436) return '#7C3AED'  // FSK UHF
         if (f > 140 && f < 200) return '#0D9488'  // PPM VHF
         return '#6B7280'
     }
-    const t = (type || '').toLowerCase()
     if (t.startsWith('rtlsdr') || t.startsWith('airspy') || t === 'funcubeproplus') return '#7C3AED'
     if (t === 'funcubepro' || t === 'usbaudio') return '#0D9488'
     return '#6B7280'
@@ -568,9 +569,8 @@ class Dashboard {
     updateNumRadios() {
         return {
             fsk: Object.values(HubMan.devs).filter(d =>
-                (d.attr?.radio?.startsWith("CTT") && d.attr?.radio !== "CTTBlu") ||
+                d.attr?.radio?.startsWith("CTT") ||
                 d.attr?.radio == "DigiBabel" || d.attr?.radio == "NanoBabel").length,
-            blu: Object.values(HubMan.devs).filter(d => d.attr?.radio === "CTTBlu").length,
             ppm: Object.values(HubMan.devs).filter(d => ["VAH", "GRH"].includes( d.attr?.radio) ).length,
         //    grh: Object.values(HubMan.devs).filter(d => d.attr?.radio == "GRH").length,
             sensors: Object.values(HubMan.devs).filter(d => d.attr?.radio == "none").length,
@@ -1507,7 +1507,7 @@ class Dashboard {
             const typeCode = {
                 'funcubeProPlus': 'FCD', 'funcubePro': 'FCD',
                 'rtlsdr': 'RTL', 'airspy': 'ASM', 'airspyhf': 'AHF',
-                'CTT/CornellRcvr': 'CTT', 'DigiBabel': 'DB', 'NanoBabel': 'NB',
+                'CTT/CornellRcvr': 'CTT', 'CTTBlu': 'BLU', 'DigiBabel': 'DB', 'NanoBabel': 'NB',
             }
             const ports = Object.keys(this.ts).sort((a, b) => parseInt(a) - parseInt(b))
             const columns = ['Tag ID', ...ports.map(port => {
