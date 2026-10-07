@@ -114,7 +114,8 @@ class FTDIReceiverProbe {
 
           try {
             const msg = JSON.parse(line)
-            if (msg?.type === 1 && msg?.channel === 1 && msg?.data !== undefined) {
+            if (msg?.type === 1 && msg?.channel === 1 &&
+                msg?.data?.app === 'blue-series-receiver') {
               this.resolve('CTTBlu')
               return
             }
