@@ -4,8 +4,10 @@
 // receiver on. Commands and responses are newline-delimited JSON. Detection
 // queues are polled independently on channels 1-4.
 //
-// Detections are decoded from the receiver, timestamped from receiver tick
-// counters, and emitted to SensorGnome for live use.
+// Detections are written to the SG-native BluOut SafeStream using the same
+// 11-column CSV schema that CTT SensorStation writes for directly attached
+// BluSeries receivers. SG handles rotation/upload bookkeeping; the row contract
+// remains CTT-compatible.
 
 const {SerialPort} = require('serialport')
 
@@ -258,6 +260,22 @@ class BluBabel {
       console.log(`CTTBlu port ${this.getPort()} ch${channel}: decode error: ${err.message}`)
       return
     }
+
+    const cttRow = [
+      this.getPort(),
+      channel,
+      '',
+      this.formatCttTime(timestamp),
+      rssi,
+      decoded.tagId.toUpperCase(),
+      decoded.sync,
+      decoded.product,
+      decoded.revision,
+      '',
+      decoded.rawPayloadHex.toUpperCase()
+    ].join(',')
+
+    if (typeof BluOut !== 'undefined') BluOut.write(cttRow + '\r\n')
 
     this.matron.emit('bluDetection', {
       port: this.getPort(),
