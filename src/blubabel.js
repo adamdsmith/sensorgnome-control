@@ -222,6 +222,14 @@ class BluBabel {
     }
 
     if (msg?.type !== TYPE_DETECTIONS) return
+
+    if (msg.channel !== this.awaitingChannel) {
+      console.log(
+        `CTTBlu port ${this.getPort()} ch${msg.channel}: ignoring late detection response`
+      )
+      return
+    }
+
     if (!msg.data || Object.keys(msg.data).length === 0) {
       this.finishPoll(msg.channel)
       return
