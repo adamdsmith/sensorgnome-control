@@ -211,6 +211,7 @@ class BluBabel {
       this.fwVersion = msg.data?.version ?? 'unknown'
       const app = msg.data?.app ?? 'unknown'
       console.log(`CTTBlu port ${this.getPort()}: firmware ${this.fwVersion}, app ${app}`)
+      this.retries = 0
       this.matron.emit('devState', this.getPort(), 'running')
       this.startPolling()
       return
