@@ -88,6 +88,7 @@ class BluBabel {
     const did = debugId++
 
     sp.on('open', () => {
+      if (sp !== this.sp) return
       this.closing = false
       console.log(`Opened CTTBlu SerialPort #${did} ${path}`)
       sp.set({dtr: false}, err => {
@@ -103,21 +104,24 @@ class BluBabel {
     })
 
     sp.on('data', data => {
+      if (sp !== this.sp) return
       this.buffer += data.toString('utf8')
       this.processBuffer()
     })
 
     sp.on('close', () => {
+      if (sp !== this.sp) return
       console.log(`CTTBlu SerialPort #${did} ${path} was closed`)
       if (!this.closing && this.dev && !this.dev.state?.startsWith('err'))
         this.matron.emit('devState', this.getPort(), 'error', 'port was closed')
     })
 
     sp.on('error', err => {
+      if (sp !== this.sp) return
       console.log(`Error on CTTBlu SerialPort #${did} ${path}: ${err.message}`)
       if (this.dev) this.matron.emit('devState', this.getPort(), 'error', err.message)
       if (sp.isOpen) sp.close()
-      if (this.dev && this.retries++ < 3) {
+      if (this.dev && !this.retryTimer && this.retries++ < 3) {
         const delay = this.retries < 3 ? 10000 : 60000
         this.retryTimer = setTimeout(() => {
           this.retryTimer = null
