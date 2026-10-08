@@ -129,11 +129,11 @@ class FTDIReceiverProbe {
 
     this.sp.on("error", err => {
       console.log(`FTDIReceiverProbe error on ${path}: ${err.message}`)
-      if (!this.resolved) this.resolve('NanoBabel')
+      if (!this.resolved) this.failProbe(`serial error: ${err.message}`)
     })
 
     this.sp.on("close", () => {
-      if (!this.resolved) this.resolve('NanoBabel')
+      if (!this.resolved) this.failProbe('serial port closed during probe')
     })
   }
 
@@ -194,6 +194,19 @@ class FTDIReceiverProbe {
     } else {
       setTimeout(create, 300)
     }
+  }
+
+  failProbe(reason) {
+    if (this.resolved) return
+    this.resolved = true
+    clearTimeout(this.probeTimeout)
+    this.probeTimeout = null
+    this.matron.removeListener("devRemoved", this.onDevRemoved)
+
+    console.log(`FTDIReceiverProbe: probe failed on port ${this.getPort()}: ${reason}`)
+    this.matron.emit('devState', this.getPort(), 'error', reason)
+
+    if (this.sp?.isOpen) this.sp.close()
   }
 
   close() {
