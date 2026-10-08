@@ -20,7 +20,7 @@
 //     { dir: "/media/SD_card/SGdata/2021-12-01", // dir holding the file
 //       date: "YYYYMMDD",
 //       name: "file1.txt.gz",
-//       type: "ctt", // receiver type (ctt/all)
+//       type: "ctt", // data type (e.g. all/ctt/blu)
 //       size: 12345, // file size in bytes
 //       start: 1637958427, // unix timestamp when file was started, derived from filename
 //       uploaded: 1637958429, // unix timestamp of last upload to server, null otherwise
@@ -346,7 +346,7 @@ class DataFiles {
     }
 
     // group key used by repack(): files are only ever combined with others of the same
-    // type (all/ctt) and bootCount, so a merged file never mixes Lotek/CTT data or spans a reboot
+    // type and bootCount, so a merged file never mixes data types or spans a reboot
     repackGroupKey(f) { return `${f.type}|${f.bootCount}` }
 
     // read a data file, transparently decompressing if it's gzipped
