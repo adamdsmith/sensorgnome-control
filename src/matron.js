@@ -36,9 +36,9 @@ Matron.prototype.devAdded = function(dev) {
         this.devices[dev.attr.port] = new CornellTagXCVR(this, dev, null);
     }
     
-    // DigiBabel and NanoBabel share the same USB VID:PID (0403:6015); probe to identify
+    // Receivers using the shared FTDI USB VID:PID (0403:6015) require protocol-level identification
     if (dev.attr.type == "DigiBabel") {
-        this.devices[dev.attr.port] = new LotekProbe(this, dev, null);
+        this.devices[dev.attr.port] = new FTDIReceiverProbe(this, dev, null);
     }
 };
 
