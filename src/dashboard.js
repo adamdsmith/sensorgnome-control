@@ -46,13 +46,14 @@ function signalColor(dbm, min, max) {
 
 // Port colour matching usb-port-map.vue's portFill logic.
 function devPortColor(type, freq) {
+    const t = (type || '').toLowerCase()
+    if (t === 'cttblu') return '#7C3AED'              // CTT Blū / 2.4 GHz FSK
     const f = parseFloat(freq)
     if (!isNaN(f) && f > 0) {
         if (f > 430 && f < 436) return '#7C3AED'  // FSK UHF
         if (f > 140 && f < 200) return '#0D9488'  // PPM VHF
         return '#6B7280'
     }
-    const t = (type || '').toLowerCase()
     if (t.startsWith('rtlsdr') || t.startsWith('airspy') || t === 'funcubeproplus') return '#7C3AED'
     if (t === 'funcubepro' || t === 'usbaudio') return '#0D9488'
     return '#6B7280'
@@ -93,7 +94,7 @@ class Dashboard {
             'sysmonitorData',
             'netHotspotState', 'netWifiConfig', 'portmapFile', 'tagDBInfo', 'motusRecv',
             'motusUploadResult', 'netDefaultGw', 'netDNS', 'lotekFreq', 'netCellState', 'netCellReason', "netScanStatus",
-            'netCellInfo', 'netCellConfig', 'cttRadioVersion', 'digibabelRadioVersion', 'nanobabelIdentified', 'vahRate', 'vahFrames', 'devState',
+            'netCellInfo', 'netCellConfig', 'cttRadioVersion', 'digibabelRadioVersion', 'nanobabelIdentified', 'cttBluIdentified', 'bluDetection', 'vahRate', 'vahFrames', 'devState',
             'rtlInfo', 'acquisition', 'gotBurst','airspyInfo',
             "enpi_light_status", "enpi_air_status", "enpi_light_toggle", "enpi_air_toggle","enpi_air_gotData","enpi_light_gotData",
             'enpi_status', 'enpi_sample_rate','enpi_sample_schedule','enpi_aws_buket_name', 'enpi_upload_status',
@@ -144,6 +145,7 @@ class Dashboard {
         // 5 minutes of detections in 10 second bins for sparklines
         this.detections = {
             ctt: Array(5*6).fill(null),
+            blu: Array(5*6).fill(null),
             lotek: Array(5*6).fill(null)
         }
         this.detection_log = []
@@ -249,6 +251,7 @@ class Dashboard {
         const typeLow = (dev.attr?.type || '').toLowerCase()
 
         const isCTT       = typeLow === 'ctt/cornellrcvr' || typeLow.startsWith('cttv')
+        const isCTTBlu    = typeLow === 'cttblu'
         const isDigiBabel = typeLow.startsWith('digibabel')
         const isNanoBabel = typeLow === 'nanobabel'
         const isAirSpyHF  = typeLow === 'airspyhf'
@@ -565,7 +568,10 @@ class Dashboard {
     // update the number of radios connected on devAdded/Removed
     updateNumRadios() {
         return {
-            fsk: Object.values(HubMan.devs).filter(d => d.attr?.radio.startsWith("CTT") || d.attr?.radio == "DigiBabel" || d.attr?.radio == "NanoBabel").length,
+            fsk: Object.values(HubMan.devs).filter(d =>
+                d.attr?.radio?.startsWith("CTT") ||
+                d.attr?.radio == "NanoBabel" ||
+                (d.attr?.radio == "DigiBabel" && d.attr?.type != "DigiBabel")).length,
             ppm: Object.values(HubMan.devs).filter(d => ["VAH", "GRH"].includes( d.attr?.radio) ).length,
         //    grh: Object.values(HubMan.devs).filter(d => d.attr?.radio == "GRH").length,
             sensors: Object.values(HubMan.devs).filter(d => d.attr?.radio == "none").length,
@@ -648,7 +654,16 @@ class Dashboard {
     handle_setParamError(info) { } // FlexDash.set('param', info) } // {param, error}
     handle_devAdded(info) {
         const port = info.attr.port
-        FlexDash.set(`devices/${port}`, this.genDevInfo(info))
+        const unresolvedFTDI = info.attr?.type === 'DigiBabel' && info.attr?.radio === 'DigiBabel'
+        if (unresolvedFTDI) {
+            const devInfo = this.genDevInfo(info)
+            devInfo.type = 'Identifying receiver…'
+            devInfo.frequency = ''
+            devInfo.color = '#FFC107'
+            FlexDash.set(`devices/${port}`, devInfo)
+        } else {
+            FlexDash.set(`devices/${port}`, this.genDevInfo(info))
+        }
         FlexDash.set(`devices/${port}/state`, info.state || 'init')
         // Determine actual mode from plan.pulseFinder + per-port override, mirroring getSensor.
         // Cannot rely on info.attr?.radio — hubman stamps rtlsdr/funcubeProPlus as 'GRH' from the
@@ -663,9 +678,11 @@ class Dashboard {
         const tDA = (info.attr?.type || '').toLowerCase()
         const devFreq = ['VAH', 'GRH'].includes(info.attr?.radio) && Acquisition.lotek_freq != null
             ? `${Acquisition.lotek_freq} MHz`
-            : (tDA === 'ctt/cornellrcvr' || tDA.startsWith('cttv') || tDA.startsWith('digibabel'))
-                ? "434 MHz"
-                : null
+            : tDA === 'cttblu'
+                ? "2400 MHz"
+                : (tDA === 'ctt/cornellrcvr' || tDA.startsWith('cttv') || tDA.startsWith('digibabel'))
+                    ? "434 MHz"
+                    : null
         FlexDash.set(`devices/${port}/frequency`, devFreq)
         // Initialize attn from the plan's default so the gain dropdown shows a selection.
         // Mirrors the defaultVal logic in buildDeviceWidgets; uses original-case type for
@@ -770,6 +787,34 @@ class Dashboard {
         // NanoBabel starts life typed as DigiBabel; reclassification changes the widget layout
         this.rebuildDevicePanelWidgets()
     }
+    handle_cttBluIdentified(info) {
+        const port = info.port
+        FlexDash.set(`devices/${port}/type`, 'CTTBlu')
+        FlexDash.set(`devices/${port}/frequency`, "2400 MHz")
+        FlexDash.set(`devices/${port}/color`, devPortColor('CTTBlu', 2400))
+        FlexDash.set('radios', this.updateNumRadios())
+        const dev = HubMan.devs[port]
+        if (dev) {
+            this.tsRemoveDevice(dev)
+            this.tsAddDevice(dev)
+        }
+        this.rebuildDevicePanelWidgets()
+    }
+
+    handle_bluDetection(info) {
+        const port = String(info.port)
+        const channel = info.channel
+        const ts = (new Date(info.timestamp * 1000)).toISOString().replace(/.*T/, '').replace(/\..*/, '')
+        this.detections.blu[this.detections.blu.length-1]++
+        FlexDash.set('detections_5min', this.detections)
+        let extra = ''
+        if (info.temp != null) extra += ` ${Number(info.temp).toFixed(2)}°C`
+        this.detectionLogPush(
+            `BLU B${port}-${channel} ${ts}: ${info.tagId} ${info.rssi}dBm${extra}`
+        )
+        this.tsGotTag(`B${port},${info.timestamp},${info.tagId}`)
+    }
+
     handle_cttRadioVersion(info) {
         const v = info.version.replace(/\..*/, '')
         FlexDash.set(`devices/${info.port}/type`, 'CTTv' + v)
@@ -1222,8 +1267,13 @@ class Dashboard {
     // device got added, init the time-series for it
     tsAddDevice(dev) {
         const port = dev.attr.port
-        if (dev.attr.type == "CTT/CornellRcvr" || dev.attr.radio == "DigiBabel") {
-            // CTT devices only produce tag detections
+        if (dev.attr.radio == "CTTBlu") {
+            this.ts[port] = {
+                tags: new TimeSeries(ts_dir, "blu-tags-"+dev.attr.port),
+                unique_tags: new TimeSeries(ts_dir, "blu-unique_tags-"+dev.attr.port),
+            }
+        } else if (dev.attr.type == "CTT/CornellRcvr" || dev.attr.radio == "DigiBabel") {
+            // CTT 434 devices only produce tag detections
             this.ts[port] = {
                 tags: new TimeSeries(ts_dir, "ctt-tags-"+dev.attr.port),
                 unique_tags: new TimeSeries(ts_dir, "ctt-unique_tags-"+dev.attr.port),
@@ -1407,7 +1457,8 @@ class Dashboard {
 
             // display
             for (const what of ['lotek-tags', 'lotek-pulses', 'lotek-noise', 'lotek-snr',
-                    'lotek-rate', 'ctt-tags', 'lotek-unique_tags', 'ctt-unique_tags']) {
+                    'lotek-rate', 'ctt-tags', 'blu-tags',
+                    'lotek-unique_tags', 'ctt-unique_tags', 'blu-unique_tags']) {
                 this.tsShow(what)
             }
             this.tsTallyShow()
@@ -1467,7 +1518,7 @@ class Dashboard {
             const typeCode = {
                 'funcubeProPlus': 'FCD', 'funcubePro': 'FCD',
                 'rtlsdr': 'RTL', 'airspy': 'ASM', 'airspyhf': 'AHF',
-                'CTT/CornellRcvr': 'CTT', 'DigiBabel': 'DB', 'NanoBabel': 'NB',
+                'CTT/CornellRcvr': 'CTT', 'CTTBlu': 'BLU', 'DigiBabel': 'DB', 'NanoBabel': 'NB',
             }
             const ports = Object.keys(this.ts).sort((a, b) => parseInt(a) - parseInt(b))
             const columns = ['Tag ID', ...ports.map(port => {
@@ -1596,6 +1647,8 @@ class Dashboard {
     detectionShifter() {
         this.detections.ctt.shift()
         this.detections.ctt.push(0)
+        this.detections.blu.shift()
+        this.detections.blu.push(0)
         this.detections.lotek.shift()
         this.detections.lotek.push(0)
         FlexDash.set('detections_5min', this.detections)
