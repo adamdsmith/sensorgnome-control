@@ -98,7 +98,6 @@ class BluBabel {
         setTimeout(() => {
           if (!this.dev || !sp.isOpen) return
           this.send(TYPE_VERSION, 1)
-          this.startPolling()
         }, BOOT_DELAY_MS)
       })
     })
@@ -213,6 +212,7 @@ class BluBabel {
       const app = msg.data?.app ?? 'unknown'
       console.log(`CTTBlu port ${this.getPort()}: firmware ${this.fwVersion}, app ${app}`)
       this.matron.emit('devState', this.getPort(), 'running')
+      this.startPolling()
       return
     }
 
