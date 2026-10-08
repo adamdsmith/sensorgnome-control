@@ -570,7 +570,8 @@ class Dashboard {
         return {
             fsk: Object.values(HubMan.devs).filter(d =>
                 d.attr?.radio?.startsWith("CTT") ||
-                d.attr?.radio == "DigiBabel" || d.attr?.radio == "NanoBabel").length,
+                d.attr?.radio == "NanoBabel" ||
+                (d.attr?.radio == "DigiBabel" && d.attr?.type != "DigiBabel")).length,
             ppm: Object.values(HubMan.devs).filter(d => ["VAH", "GRH"].includes( d.attr?.radio) ).length,
         //    grh: Object.values(HubMan.devs).filter(d => d.attr?.radio == "GRH").length,
             sensors: Object.values(HubMan.devs).filter(d => d.attr?.radio == "none").length,
@@ -653,7 +654,16 @@ class Dashboard {
     handle_setParamError(info) { } // FlexDash.set('param', info) } // {param, error}
     handle_devAdded(info) {
         const port = info.attr.port
-        FlexDash.set(`devices/${port}`, this.genDevInfo(info))
+        const unresolvedFTDI = info.attr?.type === 'DigiBabel' && info.attr?.radio === 'DigiBabel'
+        if (unresolvedFTDI) {
+            const devInfo = this.genDevInfo(info)
+            devInfo.type = 'Identifying receiver…'
+            devInfo.frequency = ''
+            devInfo.color = '#FFC107'
+            FlexDash.set(`devices/${port}`, devInfo)
+        } else {
+            FlexDash.set(`devices/${port}`, this.genDevInfo(info))
+        }
         FlexDash.set(`devices/${port}/state`, info.state || 'init')
         // Determine actual mode from plan.pulseFinder + per-port override, mirroring getSensor.
         // Cannot rely on info.attr?.radio — hubman stamps rtlsdr/funcubeProPlus as 'GRH' from the
